@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">DustIn Client</string>
+    <string name="ok">OK</string>
+    <string name="latitude_label">Latitude</string>
+    <string name="longitude_label">Longitude</string>
+    <string name="permission_locations_rationale">Location permissions are needed to demonstrate access.</string>
+    <string name="permission_available_location">Location Permission has been granted.</string>
+    <string name="permissions_not_granted">Permissions were not granted.</string>
+</resources>
