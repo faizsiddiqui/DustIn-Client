@@ -1,0 +1,21 @@
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <EditTextPreference
+        android:inputType="text"
+        android:key="@string/pref_key_ip_address"
+        android:maxLines="1"
+        android:selectAllOnFocus="true"
+        android:singleLine="true"
+        android:summary="@string/pref_summary_ip_address"
+        android:title="@string/pref_title_ip_address" />
+
+    <EditTextPreference
+        android:inputType="number"
+        android:key="@string/pref_key_port_address"
+        android:maxLines="1"
+        android:selectAllOnFocus="true"
+        android:singleLine="true"
+        android:summary="@string/pref_summary_port_address"
+        android:title="@string/pref_title_port_address" />
+
+</PreferenceScreen>
