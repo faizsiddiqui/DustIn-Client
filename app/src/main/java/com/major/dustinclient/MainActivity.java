@@ -1,7 +1,6 @@
 package com.major.dustinclient;
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.SharedPreferences;
@@ -67,6 +66,7 @@ public class MainActivity extends AppCompatActivity implements
     private final static String LOCATION_KEY = "location-key";
     private static final int REQUEST_LOCATION = 0;
     private static String[] PERMISSION_LOCATION = {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION};
+    private SharedPreferences prefs;
 
     private GoogleApiClient mGoogleApiClient;
     private LocationRequest mLocationRequest;
@@ -137,10 +137,9 @@ public class MainActivity extends AppCompatActivity implements
             }
         });
 
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        HOST = prefs.getString(getResources().getString(R.string.pref_key_ip_address), "");
-        PORT = Integer.parseInt(prefs.getString(getResources().getString(R.string.pref_key_port_address), "0"));
+        prefs = PreferenceManager.getDefaultSharedPreferences(this);
         location = new com.major.dustinclient.model.Location(this);
+
     }
 
     private void updateUI() {
@@ -149,6 +148,8 @@ public class MainActivity extends AppCompatActivity implements
             mLongitude.setText(String.format(Locale.ENGLISH, getResources().getString(R.string.longitude), mCurrentLocation.getLongitude()));
             location.setLatitude(mCurrentLocation.getLatitude());
             location.setLongitude(mCurrentLocation.getLongitude());
+            HOST = prefs.getString(getResources().getString(R.string.pref_key_ip_address), "");
+            PORT = Integer.parseInt(prefs.getString(getResources().getString(R.string.pref_key_port_address), "0"));
             new SocketClient().execute(location.toJson());
         }
     }
@@ -157,22 +158,6 @@ public class MainActivity extends AppCompatActivity implements
     protected void onSaveInstanceState(Bundle savedInstanceState) {
         savedInstanceState.putParcelable(LOCATION_KEY, mCurrentLocation);
         super.onSaveInstanceState(savedInstanceState);
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        switch (requestCode) {
-            case REQUEST_CHECK_SETTINGS:
-                switch (resultCode) {
-                    case Activity.RESULT_OK:
-                        break;
-                    case Activity.RESULT_CANCELED:
-                        break;
-                    default:
-                        break;
-                }
-                break;
-        }
     }
 
     protected void startLocationUpdates() {
@@ -246,15 +231,19 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-            case R.id.settings:
+            case R.id.action_settings:
                 Intent intent = new Intent(this, SettingsActivity.class);
                 intent.putExtra(PreferenceActivity.EXTRA_SHOW_FRAGMENT, SettingsActivity.GeneralPreferenceFragment.class.getName());
                 intent.putExtra(PreferenceActivity.EXTRA_NO_HEADERS, true);
                 startActivity(intent);
-                return true;
+                break;
+            case R.id.action_refresh:
+                updateUI();
+                break;
             default:
                 return super.onOptionsItemSelected(item);
         }
+        return true;
     }
 
     @Override
@@ -341,40 +330,60 @@ public class MainActivity extends AppCompatActivity implements
     public class SocketClient extends AsyncTask<JSONObject, Void, Void> {
 
         private String data;
+        private Boolean socketAddressSet = false;
+        private Boolean socketConnected = false;
 
         @Override
         protected Void doInBackground(JSONObject... params) {
             data = params[0].toString();
             if (socket == null) {
                 if (!HOST.isEmpty() && !PORT.equals(0)) {
+                    socketAddressSet = true;
                     try {
                         socket = new Socket(HOST, PORT);
                         bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-                } else {
-                    Toast.makeText(getApplicationContext(), getResources().getString(R.string.socket_ip_port_not_set), Toast.LENGTH_SHORT).show();
                 }
             }
-            if (socket.isConnected()) {
-                try {
-                    bufferedWriter.write(String.format(getResources().getString(R.string.socket_data_length), data.length()));
-                    bufferedWriter.write(data, 0, data.length());
-                    bufferedWriter.flush();
-                } catch (IOException e) {
-                    e.printStackTrace();
+
+            if (socket != null) {
+                if (socket.isConnected()) {
+                    socketConnected = true;
+                    socketAddressSet = true;
+                    try {
+                        bufferedWriter.write(String.format(getResources().getString(R.string.socket_data_length), data.length()));
+                        bufferedWriter.write(data, 0, data.length());
+                        bufferedWriter.flush();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    try {
+                        socket.close();
+                        socket = new Socket(HOST, PORT);
+                        bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
-            } else {
-                Log.d("Socket Status", "Failed");
             }
             return null;
         }
 
         @Override
         protected void onPostExecute(Void aVoid) {
-            mIP.setText(String.format(getResources().getString(R.string.socket_address), HOST, PORT));
-            Toast.makeText(getApplicationContext(), getResources().getString(R.string.socket_data_sent), Toast.LENGTH_SHORT).show();
+            if (socketAddressSet) {
+                if (socketConnected) {
+                    mIP.setText(String.format(getResources().getString(R.string.socket_address), HOST, PORT));
+                    Toast.makeText(getApplicationContext(), getResources().getString(R.string.socket_data_sent), Toast.LENGTH_SHORT).show();
+                } else {
+                    mIP.setText(String.format(getResources().getString(R.string.socket_connection_failed), HOST, PORT));
+                }
+            } else {
+                Toast.makeText(getApplicationContext(), getResources().getString(R.string.socket_ip_port_not_set), Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
