@@ -22,6 +22,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -41,11 +42,11 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.DataOutputStream;
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.net.Socket;
 import java.util.Locale;
 
@@ -75,7 +76,8 @@ public class MainActivity extends AppCompatActivity implements
     private String HOST;
     private Integer PORT;
     private Socket socket;
-    private DataOutputStream dataOutputStream;
+    private BufferedWriter bufferedWriter;
+    private com.major.dustinclient.model.Location location;
 
     private View parentLayout;
     private TextView mLatitude, mLongitude, mIP;
@@ -138,21 +140,16 @@ public class MainActivity extends AppCompatActivity implements
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         HOST = prefs.getString(getResources().getString(R.string.pref_key_ip_address), "");
         PORT = Integer.parseInt(prefs.getString(getResources().getString(R.string.pref_key_port_address), "0"));
-
+        location = new com.major.dustinclient.model.Location(this);
     }
 
     private void updateUI() {
         if (mCurrentLocation != null) {
             mLatitude.setText(String.format(Locale.ENGLISH, getResources().getString(R.string.latitude), mCurrentLocation.getLatitude()));
             mLongitude.setText(String.format(Locale.ENGLISH, getResources().getString(R.string.longitude), mCurrentLocation.getLongitude()));
-            JSONObject jsonData = new JSONObject();
-            try {
-                jsonData.put(getResources().getString(R.string.LATITUDE), mCurrentLocation.getLatitude());
-                jsonData.put(getResources().getString(R.string.LONGITUDE), mCurrentLocation.getLongitude());
-                new SocketClient().execute(jsonData);
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
+            location.setLatitude(mCurrentLocation.getLatitude());
+            location.setLongitude(mCurrentLocation.getLongitude());
+            new SocketClient().execute(location.toJson());
         }
     }
 
@@ -229,13 +226,14 @@ public class MainActivity extends AppCompatActivity implements
             }
         }
 
-        if (dataOutputStream != null) {
+        if (bufferedWriter != null) {
             try {
-                dataOutputStream.close();
+                bufferedWriter.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
+
     }
 
     @Override
@@ -342,31 +340,33 @@ public class MainActivity extends AppCompatActivity implements
 
     public class SocketClient extends AsyncTask<JSONObject, Void, Void> {
 
-        private JSONObject data;
+        private String data;
 
         @Override
         protected Void doInBackground(JSONObject... params) {
-            data = params[0];
+            data = params[0].toString();
             if (socket == null) {
                 if (!HOST.isEmpty() && !PORT.equals(0)) {
                     try {
                         socket = new Socket(HOST, PORT);
-                        dataOutputStream = new DataOutputStream(socket.getOutputStream());
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            } else {
-                if (socket.isConnected()) {
-                    try {
-                        dataOutputStream.writeUTF(data.toString());
-                        Log.d("Socket Data", data.toString());
+                        bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                 } else {
-                    Log.d("Socket Status", "Failed");
+                    Toast.makeText(getApplicationContext(), getResources().getString(R.string.socket_ip_port_not_set), Toast.LENGTH_SHORT).show();
                 }
+            }
+            if (socket.isConnected()) {
+                try {
+                    bufferedWriter.write(String.format(getResources().getString(R.string.socket_data_length), data.length()));
+                    bufferedWriter.write(data, 0, data.length());
+                    bufferedWriter.flush();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                Log.d("Socket Status", "Failed");
             }
             return null;
         }
@@ -374,6 +374,7 @@ public class MainActivity extends AppCompatActivity implements
         @Override
         protected void onPostExecute(Void aVoid) {
             mIP.setText(String.format(getResources().getString(R.string.socket_address), HOST, PORT));
+            Toast.makeText(getApplicationContext(), getResources().getString(R.string.socket_data_sent), Toast.LENGTH_SHORT).show();
         }
     }
 

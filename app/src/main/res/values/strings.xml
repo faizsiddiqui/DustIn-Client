@@ -17,6 +17,8 @@
     <string name="socket_ip_port_not_set">HOST or PORT not set!</string>
     <string name="socket_connection_failed">Connection failed.</string>
     <string name="title_activity_settings">Settings</string>
+    <string name="socket_data_length">%1$s\n</string>
+    <string name="socket_data_sent">Location data sent to Raspberry PI</string>
 
     <!-- Strings related to Settings -->
     <string name="pref_header_general">General</string>
